@@ -95,12 +95,39 @@ ${tools_description}
 
 MASTER_SYSTEM_PROMPT= """
 ## 角色
-你是一个优秀的problem solver，你擅长编排任务流程以及调用工具来解决复杂问题
+你擅长将问题交给executor_agent解决，然后将它得到的答案转化为用户想要的格式
 ${tools_description}
 
-## 你需要做什么
-- 编排完成任务的具体流程，写出一个todo_list
-- 一步步完成你的todo_list，直到任务完成
+## 重要说明：
+1. 当你认为executor_agent已经解决了用户的问题时，请你提取出用户最关心的答案，格式如下：
+<think>你的思考（如果需要分析）</think>
+你的回答内容（简洁、关键词、确保没有任何多余内容）
+例如：
+- Q:1+1=?   
+- A:2
+- Q:在生灵奇旅的第一集中，什么河被称为死亡之河
+- A:马拉河
+- Q:athropics发布的claude-code在github上的README.md中提到的安装指令是什么？
+- A:npm install -g @anthropic-ai/claude-code
+- Q:截至2025年8月25号athropics发布的claude-code在github上的tags版本有多少个？
+- A:<think>我没有看到任何tags版本，用户问有几个，我应该直接回答0</think>0
+2. 当问题没有被解决时，你应该给executor_agent提供足够上下文，将问题交给他解决
+```json
+{
+    "think": "你的思考（如果需要分析）",
+    "tool_name": "executor_agent",
+    "arguments": {
+        "parameter_name": "参数值"
+    }
+}
+
+"""
+
+
+EXECUTOR_SYSTEM_PROMPT="""
+## 角色
+你是一个优秀的problem solver，你擅长调用工具来解决问题
+${tools_description}
 
 ## Rule
 - 如果能直接解决问题，请直接回答；
@@ -115,17 +142,7 @@ ${tools_description}
 ## 重要说明：
 1. 当你收集到足够信息可以回答用户问题时，请按以下格式回复：
 <think>你的思考（如果需要分析）</think>
-你的回答内容（简洁、关键词、确保没有任何多余内容）
-例如：
-- Q:1+1=?   
-- A:2
-- Q:在生灵奇旅的第一集中，什么河被称为死亡之河
-- A:马拉河
-- Q:athropics发布的claude-code在github上的README.md中提到的安装指令是什么？
-- A:npm install -g @anthropic-ai/claude-code
-- Q:截至2025年8月25号athropics发布的claude-code在github上的tags版本有多少个？
-- A:<think>我没有看到任何tags版本，用户问有几个，我应该直接回答0</think>0
-
+你的回答内容
 2. 当你需要使用工具时，必须且只能回复以下确切的JSON对象格式，不要包含其他内容：
 ```json
 {
@@ -135,6 +152,7 @@ ${tools_description}
         "参数名": "参数值"
     }
 }
+
 """
 
 
@@ -223,28 +241,47 @@ oxy_space = [
         desc_for_llm="通过MCP协议提取b站字幕、弹幕、评论"
     ),
     
-    # oxy.ReActAgent(
-    #         name="browser_agent",
-    #         llm_model="chat_llm",
-    #         desc="A tool for file operation.",
-    #         desc_for_llm="Agent for file system operations",
-    #         category="agent",
-    #         class_name="ReActAgent",
-    #         tools=["browser_tool"],
-    #         prompt=BROWSER_SYSTEM_PROMPT,
-    #         is_entrance=False,
-    #         is_permission_required=False,
-    #         is_save_data=True,
-    #         is_multimodal_supported=False,
-    #         semaphore=2,
-    #     ),
+    oxy.ReActAgent(
+            name="browser_agent",
+            llm_model="chat_llm",
+            desc_for_llm="可以使用浏览器检索的agent",
+            category="agent",
+            class_name="ReActAgent",
+            tools=["browser_tool"],
+            prompt=BROWSER_SYSTEM_PROMPT,
+            is_entrance=False,
+            is_permission_required=False,
+            is_save_data=True,
+            is_multimodal_supported=False,
+            semaphore=2,
+        ),
+    oxy.ReActAgent(
+            name="math_agent",
+            llm_model="chat_llm",
+            desc_for_llm="可以使用数学工具解决数学问题的agent",
+            category="agent",
+            tools=["math_tools"],
+        ),
+    oxy.ReActAgent(
+            name="bilibili_agent",
+            llm_model="chat_llm",
+            desc_for_llm="可以提取b站字幕、弹幕和评论的agent",
+            category="agent",
+            tools=["bilibili_tool"],
+        ),
+    oxy.ReActAgent(
+        name="executor_agent",
+        prompt=EXECUTOR_SYSTEM_PROMPT,
+        llm_model="chat_llm",
+        sub_agents=[ "browser_agent", "math_agent", "bilibili_agent"],
+        # tools=["browser_tool", "math_tools", "bilibili_tool"]
+    ),
     oxy.ReActAgent(
         is_master=True,
         name="master_agent",
         prompt=MASTER_SYSTEM_PROMPT,
         llm_model="chat_llm",
-        # sub_agents=[ "browser_agent", "math_agent"],
-        tools=["browser_tool", "math_tools", "bilibili_tool"]
+        sub_agents=[ "executor_agent"],
     ),
 ]
 
