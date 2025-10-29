@@ -49,7 +49,7 @@ async def test_read_pdf_document():
     print("Testing read_pdf_document function...")
 
     # Test file path
-    test_file = "/home/rene/projs/super-agent/OxyGent/super_agent/tools/test_files/test_document.pdf"
+    test_file = "/home/rene/projs/super-agent/OxyGent/data/valid/help_1756092800998.pdf"
 
     try:
         # Try to import and use the actual function
@@ -151,8 +151,8 @@ if __name__ == "__main__":
     load_dotenv()
     # test_read_txt_document()
     # Test XLSX reading
-    asyncio.run(test_read_xlsx_document())
+    # asyncio.run(test_read_xlsx_document())
     # Test PPT reading
     # asyncio.run(test_read_ppt_document())
     # Test PDF reading with asyncio
-    # asyncio.run(test_read_pdf_document())
+    asyncio.run(test_read_pdf_document())

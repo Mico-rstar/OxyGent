@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 from oxygent import MAS, Config, oxy, preset_tools
 from tools.multimodal_tools import multimodal_tools
+from tools.document_reader import document_tools
 from prompts import BROWSER_SYSTEM_PROMPT, MASTER_SYSTEM_PROMPT, EXECUTOR_SYSTEM_PROMPT
 
 # 自动加载 .env 文件中的环境变量
@@ -26,13 +27,14 @@ oxy_space = [
         model_name=os.getenv("DEFAULT_LLM_REASON_MODEL_NAME"),
     ),
     multimodal_tools,
+    document_tools,
     preset_tools.math_tools,
-    # oxy.ReActAgent(
-    #     name="math_agent",
-    #     llm_model="reason_llm",
-    #     desc="A tool that can perform mathematical calculations.",
-    #     tools=["math_tools"],
-    # ),
+    oxy.ReActAgent(
+        name="math_agent",
+        llm_model="reason_llm",
+        desc="A tool that can perform mathematical calculations.",
+        tools=["math_tools"],
+    ),
     oxy.StdioMCPClient(
         name="browser_tool",
         params={
@@ -97,10 +99,17 @@ oxy_space = [
             tools=["multimodal_tools"],
     ),
     oxy.ReActAgent(
+        name="document_agent",
+        llm_model="chat_llm",
+        desc_for_llm="可以读取txt,pdf,ppt,xlsx格式文件的agent",
+        category="agent",
+        tools=["document_tools"],
+    ),
+    oxy.ReActAgent(
         name="executor_agent",
         prompt=EXECUTOR_SYSTEM_PROMPT,
         llm_model="chat_llm",
-        sub_agents=[ "browser_agent", "bilibili_agent", "mutimodel_agent"],
+        sub_agents=[ "browser_agent", "bilibili_agent", "mutimodel_agent", "document_agent", "math_agent"],
     ),
     oxy.ReActAgent(
         is_master=True,

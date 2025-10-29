@@ -7,12 +7,9 @@ import os
 from typing import Optional
 from pydantic import Field
 
-try:
-    from dashscope import MultiModalConversation
-    import dashscope
-    DASHSCOPE_AVAILABLE = True
-except ImportError:
-    DASHSCOPE_AVAILABLE = False
+from dashscope import MultiModalConversation
+import dashscope
+
 
 from oxygent.oxy import FunctionHub
 
@@ -21,7 +18,7 @@ multimodal_tools = FunctionHub(name="multimodal_tools")
 
 @multimodal_tools.tool(description="理解图片内容并提供详细描述")
 def understand_image(
-    image_path: str = Field(description="图片文件的绝对路径"),
+    image: str = Field(description="图片文件的文件名"),
     question: str = Field(default="请描述这张图片的内容", description="关于图片的问题，默认为描述图片内容"),
 ) -> str:
     """
@@ -41,9 +38,8 @@ def understand_image(
         FileNotFoundError: 如果图片文件不存在
         ValueError: 如果API调用失败
     """
+    image_path = os.getenv("DEFAULT_FILE_PATH") + image
     model: str = "qwen3-vl-plus"
-    if not DASHSCOPE_AVAILABLE:
-        raise ImportError("dashscope库未安装，请使用 'pip install dashscope' 安装")
 
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"图片文件不存在: {image_path}")
@@ -89,7 +85,7 @@ def understand_image(
 
 @multimodal_tools.tool(description="理解视频内容并提供详细描述")
 def understand_video(
-    video_path: str = Field(description="视频文件的路径"),
+    video: str = Field(description="视频文件的路径"),
     question: str = Field(default="请描述这段视频的内容", description="关于视频的问题，默认为描述视频内容"),
 ) -> str:
     """
@@ -113,8 +109,7 @@ def understand_video(
     """
     model: str = "qwen3-vl-plus"
     fps: float = 2.0
-    if not DASHSCOPE_AVAILABLE:
-        raise ImportError("dashscope库未安装，请使用 'pip install dashscope' 安装")
+    video_path = os.getenv("DEFAULT_FILE_PATH") + video
 
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"视频文件不存在: {video_path}")
@@ -158,31 +153,3 @@ def understand_video(
     except Exception as e:
         raise ValueError(f"视频理解失败: {str(e)}")
 
-
-@multimodal_tools.tool(description="检查多模态工具的依赖和配置")
-def check_multimodal_setup() -> dict:
-    """
-    检查多模态工具的依赖和配置状态
-
-    Returns:
-        包含检查结果的字典
-    """
-    result = {
-        "dashscope_installed": DASHSCOPE_AVAILABLE,
-        "api_key_configured": bool(os.getenv('DASHSCOPE_API_KEY')),
-        "supported_models": ["qwen3-vl-plus", "qwen3-vl-max", "qwen-vl-plus", "qwen-vl-max"],
-        "recommended_model": "qwen3-vl-plus"
-    }
-
-    if not DASHSCOPE_AVAILABLE:
-        result["install_command"] = "pip install dashscope"
-        result["status"] = "error"
-        result["message"] = "dashscope库未安装"
-    elif not result["api_key_configured"]:
-        result["status"] = "error"
-        result["message"] = "未配置DashScope API Key"
-    else:
-        result["status"] = "ready"
-        result["message"] = "多模态工具配置完成，可以使用"
-
-    return result

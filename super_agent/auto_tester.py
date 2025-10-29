@@ -1,11 +1,14 @@
 import asyncio
 import os
 import json
+import ast
 from datetime import datetime
 from dotenv import load_dotenv
 
 from oxygent import MAS, Config, oxy, preset_tools
 from prompts import BROWSER_SYSTEM_PROMPT, MASTER_SYSTEM_PROMPT, EXECUTOR_SYSTEM_PROMPT
+from tools.multimodal_tools import multimodal_tools
+from tools.document_reader import document_tools
 
 # 自动加载 .env 文件中的环境变量
 load_dotenv()
@@ -13,19 +16,22 @@ load_dotenv()
 Config.set_agent_llm_model("default_llm")
 
 
+
 oxy_space = [
     oxy.HttpLLM(
         name="chat_llm",
-        api_key=os.getenv("DEFAULT_LLM_API_KEY"),
+        api_key=os.getenv("DASHSCOPE_API_KEY"),
         base_url=os.getenv("DEFAULT_LLM_BASE_URL"),
         model_name=os.getenv("DEFAULT_LLM_CHAT_MODEL_NAME"),
     ),
-    oxy.HttpLLM(
-        name="reason_llm",
-        api_key=os.getenv("DEFAULT_LLM_API_KEY"),
-        base_url=os.getenv("DEFAULT_LLM_BASE_URL"),
-        model_name=os.getenv("DEFAULT_LLM_REASON_MODEL_NAME"),
-    ),
+    # oxy.HttpLLM(
+    #     name="reason_llm",
+    #     api_key=os.getenv("DEFAULT_LLM_API_KEY"),
+    #     base_url=os.getenv("DEFAULT_LLM_BASE_URL"),
+    #     model_name=os.getenv("DEFAULT_LLM_REASON_MODEL_NAME"),
+    # ),
+    multimodal_tools,
+    document_tools,
     preset_tools.math_tools,
     # oxy.ReActAgent(
     #     name="math_agent",
@@ -90,11 +96,24 @@ oxy_space = [
             tools=["bilibili_tool"],
         ),
     oxy.ReActAgent(
+            name="mutimodel_agent",
+            llm_model="chat_llm",
+            desc_for_llm="可以理解图片，视频的多模态理解agent",
+            category="agent",
+            tools=["multimodal_tools"],
+    ),
+    oxy.ReActAgent(
+        name="document_agent",
+        llm_model="chat_llm",
+        desc_for_llm="可以读取txt,pdf,ppt,xlsx格式文件的agent",
+        category="agent",
+        tools=["document_tools"],
+    ),
+    oxy.ReActAgent(
         name="executor_agent",
         prompt=EXECUTOR_SYSTEM_PROMPT,
         llm_model="chat_llm",
-        sub_agents=[ "browser_agent", "math_agent", "bilibili_agent"],
-        # tools=["browser_tool", "math_tools", "bilibili_tool"]
+        sub_agents=[ "browser_agent", "bilibili_agent", "mutimodel_agent", "document_agent", "math_agent"],
     ),
     oxy.ReActAgent(
         is_master=True,
@@ -104,6 +123,24 @@ oxy_space = [
         sub_agents=[ "executor_agent"],
     ),
 ]
+
+
+def build_query(query, filename):
+    """
+    构建查询字符串，如果file_name不为空，则在query前加上file_path前缀
+
+    Args:
+        query (str): 原始查询字符串
+        file_name (str, optional): 文件名，如果为None或空字符串，则不加前缀
+        file_path (str): 文件路径前缀，默认为"FILE_PATH"
+
+    Returns:
+        str: 构建后的查询字符串
+    """
+    if filename and len(filename.strip()) > 0:
+        return f"filename:{filename.strip()} + \n\n + {query.strip()}"
+    else:
+        return query.strip()
 
 
 def load_test_data(data_path):
@@ -123,66 +160,13 @@ def load_test_data(data_path):
 
 
 
-
-
-async def process_single_task(mas, task_data, results):
-    """处理单个任务"""
-    task_id = task_data['task_id']
-    query = task_data['query']
-
-    print(f"\n开始处理任务 {task_id}: {query[:50]}...")
-
-    try:
-        # 运行MAS系统 - 使用批量处理接口但只处理一个查询
-        batch_results = await mas.start_batch_processing([query], return_trace_id=True)
-
-        # 提取结果
-        answer = ""
-        if batch_results and len(batch_results) > 0:
-            result = batch_results[0]
-            if isinstance(result, str):
-                answer = result
-            elif hasattr(result, 'output'):
-                answer = result.output
-            elif hasattr(result, 'answer'):
-                answer = result.answer
-            else:
-                answer = str(result)
-
-        # 保存结果
-        results.append({
-            "task_id": task_id,
-            "answer": answer.strip(),
-            "original_query": query,
-            "level": task_data.get('level', ''),
-            "file_name": task_data.get('file_name', ''),
-            "true_answer": task_data.get('answer', ''),  # 验证集有答案
-            "steps": task_data.get('steps', '')  # 验证集有步骤
-        })
-
-        print(f"任务 {task_id} 完成，答案: {answer[:100]}...")
-
-    except Exception as e:
-        print(f"任务 {task_id} 处理失败: {e}")
-        # 保存错误结果
-        results.append({
-            "task_id": task_id,
-            "answer": f"ERROR: {str(e)}",
-            "original_query": query,
-            "level": task_data.get('level', ''),
-            "file_name": task_data.get('file_name', ''),
-            "true_answer": task_data.get('answer', ''),
-            "steps": task_data.get('steps', '')
-        })
-
-
 async def main():
     # 设置实验名称用于结果保存
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     Config.set_app_name(f'mas_test_{timestamp}')
 
     # 加载验证集数据（也可以改为测试集）
-    data_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'valid', 'data.jsonl')
+    data_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'test', 'data1.jsonl')
     # 如果要使用测试集，请取消注释下面一行并注释上面一行
     # data_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'test', 'data.jsonl')
 
@@ -202,24 +186,46 @@ async def main():
     results = []
 
     async with MAS(oxy_space=oxy_space) as mas:
-        if use_batch_processing:
-            # 批量处理模式 - 更高效
-            print("使用批量处理模式...")
-            queries = [task['query'] for task in test_data]
+        # if use_batch_processing:
+        # 批量处理模式 - 每次5个任务
+        print("使用批量处理模式（每次处理5个任务）...")
 
-            batch_results = await mas.start_batch_processing(queries, return_trace_id=True)
+        batch_size = 1
+        total_tasks = len(test_data)
 
-            for i, (task_data, result) in enumerate(zip(test_data, batch_results)):
-                print(f"\n进度: {i+1}/{len(test_data)}")
+        for batch_start in range(0, total_tasks, batch_size):
+            batch_end = min(batch_start + batch_size, total_tasks)
+            batch_tasks = test_data[batch_start:batch_end]
 
+            print(f"\n处理批次 {batch_start//batch_size + 1}: 任务 {batch_start+1}-{batch_end}")
+
+            # 构建当前批次的查询列表，如果file_name不为空则加上前缀
+            batch_queries = [build_query(task['query'], task.get('file_name', '')) for task in batch_tasks]
+            batch_results = await mas.start_batch_processing(batch_queries, return_trace_id=True)
+
+            for i, (task_data, result) in enumerate(zip(batch_tasks, batch_results)):
                 # 提取结果
                 answer = ""
-                if isinstance(result, str):
-                    answer = result
+                # 直接处理字典类型的结果
+                if isinstance(result, dict):
+                    if 'output' in result:
+                        answer = str(result['output'])
+                    else:
+                        answer = str(result)
+                elif isinstance(result, str):
+                    # 如果结果字符串看起来像字典，尝试解析
+                    try:
+                        parsed_result = ast.literal_eval(result)
+                        if isinstance(parsed_result, dict) and 'output' in parsed_result:
+                            answer = str(parsed_result['output'])
+                        else:
+                            answer = result
+                    except:
+                        answer = result
                 elif hasattr(result, 'output'):
-                    answer = result.output
+                    answer = str(result.output)
                 elif hasattr(result, 'answer'):
-                    answer = result.answer
+                    answer = str(result.answer)
                 else:
                     answer = str(result)
 
@@ -234,29 +240,33 @@ async def main():
                 })
 
                 print(f"任务 {task_data['task_id']} 完成，答案: {answer[:100]}...")
+                # 每个批次完成后保存中间结果
+                current_progress = batch_end
+                save_results(results, f"./test_results/intermediate_results_{current_progress}.jsonl")
+                print(f"已保存中间结果 ({current_progress}/{total_tasks} 个任务)")
 
-                # 每10个任务保存一次中间结果
-                if (i + 1) % 10 == 0:
-                    save_results(results, f"intermediate_results_{i+1}.jsonl")
-                    print(f"已保存中间结果 ({i+1} 个任务)")
-        else:
-            # 串行处理模式 - 便于调试和监控
-            print("使用串行处理模式...")
-            for i, task_data in enumerate(test_data, 1):
-                print(f"\n进度: {i}/{len(test_data)}")
-                await process_single_task(mas, task_data, results)
+            
+                # 显示进度
+                progress_percentage = (current_progress / total_tasks) * 100
+                print(f"总体进度: {progress_percentage:.1f}% ({current_progress}/{total_tasks})")
+        # else:
+        #     # 串行处理模式 - 便于调试和监控
+        #     print("使用串行处理模式...")
+        #     for i, task_data in enumerate(test_data, 1):
+        #         print(f"\n进度: {i}/{len(test_data)}")
+        #         await process_single_task(mas, task_data, results)
 
-                # 每10个任务保存一次中间结果
-                if i % 10 == 0:
-                    save_results(results, f"intermediate_results_{i}.jsonl")
-                    print(f"已保存中间结果 ({i} 个任务)")
+        #         # 每10个任务保存一次中间结果
+        #         if i % 10 == 0:
+        #             save_results(results, f"intermediate_results_{i}.jsonl")
+        #             print(f"已保存中间结果 ({i} 个任务)")
 
     # 保存最终结果
-    final_result_file = f"final_results_{timestamp}.jsonl"
+    final_result_file = f"./test_results/final_results_{timestamp}.jsonl"
     save_results(results, final_result_file)
 
     # 生成简化格式的结果文件（用于提交）
-    submission_file = f"submission_results_{timestamp}.jsonl"
+    submission_file = f"./test_results/submission_results_{timestamp}.jsonl"
     save_submission_format(results, submission_file)
 
     print(f"\n所有任务处理完成！")

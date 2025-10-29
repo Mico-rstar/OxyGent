@@ -52,7 +52,7 @@ def _convert_pdf_to_images(pdf_path: str, output_dir: str) -> list:
 
 @document_tools.tool(description="读取TXT文档内容")
 def read_txt_document(
-    file_path: str = Field(description="TXT文档文件的绝对路径"),
+    filename: str = Field(description="TXT文档的文件名"),
     encoding: str = Field(description="文件编码，如utf-8")
 ) -> str:
     """
@@ -69,6 +69,7 @@ def read_txt_document(
         FileNotFoundError: 如果文件不存在
         UnicodeDecodeError: 如果编码错误
     """
+    file_path = os.getenv("DEFAULT_FILE_PATH") + filename
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"文件不存在: {file_path}")
 
@@ -90,7 +91,7 @@ def read_txt_document(
 
 @document_tools.tool(description="读取PDF文档内容")
 def read_pdf_document(
-    file_path: str = Field(description="PDF文档文件的绝对路径"),
+    filename: str = Field(description="PDF文档文件的文件名"),
     question: str = Field(description="对文档的特定要求"),
 ) -> str:
     """
@@ -109,6 +110,7 @@ def read_pdf_document(
         ValueError: 如果API调用失败
     """
 
+    file_path = os.getenv("DEFAULT_FILE_PATH") + filename
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"PDF文件不存在: {file_path}")
 
@@ -163,7 +165,7 @@ def read_pdf_document(
 
 @document_tools.tool(description="读取PPT文档内容")
 def read_ppt_document(
-    file_path: str = Field(description="PPT文档文件的绝对路径"),
+    filename: str = Field(description="PPT文档的文件名"),
 ) -> str:
     """
     读取PPT文档内容
@@ -178,7 +180,7 @@ def read_ppt_document(
         ImportError: 如果缺少依赖库
         FileNotFoundError: 如果文件不存在
     """
-
+    file_path = os.getenv("DEFAULT_FILE_PATH") + filename
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"PPT文件不存在: {file_path}")
 
@@ -214,7 +216,7 @@ def read_ppt_document(
 
 @document_tools.tool(description="读取Excel文档内容")
 def read_xlsx_document(
-    file_path: str = Field(description="Excel文档文件的绝对路径"),
+    filename: str = Field(description="Excel文档的文件名"),
 ) -> str:
     """
     读取Excel文档内容
@@ -231,6 +233,7 @@ def read_xlsx_document(
         ImportError: 如果缺少依赖库
         FileNotFoundError: 如果文件不存在
     """
+    file_path = os.getenv("DEFAULT_FILE_PATH") + filename
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Excel文件不存在: {file_path}")
 
