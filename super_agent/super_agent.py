@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 
 from oxygent import MAS, Config, oxy, preset_tools
+from tools.multimodal_tools import multimodal_tools
 from prompts import BROWSER_SYSTEM_PROMPT, MASTER_SYSTEM_PROMPT, EXECUTOR_SYSTEM_PROMPT
 
 # 自动加载 .env 文件中的环境变量
@@ -24,6 +25,7 @@ oxy_space = [
         base_url=os.getenv("DEFAULT_LLM_BASE_URL"),
         model_name=os.getenv("DEFAULT_LLM_REASON_MODEL_NAME"),
     ),
+    multimodal_tools,
     preset_tools.math_tools,
     # oxy.ReActAgent(
     #     name="math_agent",
@@ -88,11 +90,17 @@ oxy_space = [
             tools=["bilibili_tool"],
         ),
     oxy.ReActAgent(
+            name="mutimodel_agent",
+            llm_model="chat_llm",
+            desc_for_llm="可以理解图片，视频的多模态理解agent",
+            category="agent",
+            tools=["multimodal_tools"],
+    ),
+    oxy.ReActAgent(
         name="executor_agent",
         prompt=EXECUTOR_SYSTEM_PROMPT,
         llm_model="chat_llm",
-        sub_agents=[ "browser_agent", "math_agent", "bilibili_agent"],
-        # tools=["browser_tool", "math_tools", "bilibili_tool"]
+        sub_agents=[ "browser_agent", "bilibili_agent", "mutimodel_agent"],
     ),
     oxy.ReActAgent(
         is_master=True,
