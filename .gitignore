@@ -247,3 +247,8 @@ deployment/
 # 数据集文件
 data/
 super_agent/tools/test_files/
+# Midscene.js dump files
+midscene_run/dump
+midscene_run/report
+midscene_run/tmp
+midscene_run/log

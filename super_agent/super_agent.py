@@ -16,30 +16,34 @@ Config.set_agent_llm_model("default_llm")
 oxy_space = [
     oxy.HttpLLM(
         name="chat_llm",
-        api_key=os.getenv("DEFAULT_LLM_API_KEY"),
+        api_key=os.getenv("DASHSCOPE_API_KEY"),
         base_url=os.getenv("DEFAULT_LLM_BASE_URL"),
         model_name=os.getenv("DEFAULT_LLM_CHAT_MODEL_NAME"),
-    ),
-    oxy.HttpLLM(
-        name="reason_llm",
-        api_key=os.getenv("DEFAULT_LLM_API_KEY"),
-        base_url=os.getenv("DEFAULT_LLM_BASE_URL"),
-        model_name=os.getenv("DEFAULT_LLM_REASON_MODEL_NAME"),
     ),
     multimodal_tools,
     document_tools,
     preset_tools.math_tools,
-    oxy.ReActAgent(
-        name="math_agent",
-        llm_model="reason_llm",
-        desc="A tool that can perform mathematical calculations.",
-        tools=["math_tools"],
-    ),
+    # oxy.StdioMCPClient(
+    #     name="browser_tool",
+    #     params={
+    #         "command": "npx",
+    #         "args": ["-y", "@midscene/mcp"],
+    #         "env": {
+    #             "MIDSCENE_MODEL_NAME": "REPLACE_WITH_YOUR_MODEL_NAME",
+    #             "OPENAI_API_KEY": "REPLACE_WITH_YOUR_OPENAI_API_KEY",
+    #             "MCP_SERVER_REQUEST_TIMEOUT": "800000"
+    #         }
+    #     },
+    #     category="tool",
+    #     class_name="StdioMCPClient",
+    #     desc="Browser automation tools via MCP",
+    #     desc_for_llm="Browser automation tools via MCP protocol"
+    # ),
     oxy.StdioMCPClient(
         name="browser_tool",
         params={
             "command": "npx",
-            "args": ["@browsermcp/mcp@latest"]
+            "args": ["-y", "chrome-devtools-mcp@latest"]
         },
         category="tool",
         class_name="StdioMCPClient",
@@ -66,7 +70,7 @@ oxy_space = [
     oxy.ReActAgent(
             name="browser_agent",
             llm_model="chat_llm",
-            desc_for_llm="可以使用浏览器检索的agent",
+            desc_for_llm="可以使用浏览器检索信息的agent",
             category="agent",
             class_name="ReActAgent",
             tools=["browser_tool"],
@@ -83,13 +87,6 @@ oxy_space = [
             desc_for_llm="可以使用数学工具解决数学问题的agent",
             category="agent",
             tools=["math_tools"],
-        ),
-    oxy.ReActAgent(
-            name="bilibili_agent",
-            llm_model="chat_llm",
-            desc_for_llm="可以提取b站字幕、弹幕和评论的agent",
-            category="agent",
-            tools=["bilibili_tool"],
         ),
     oxy.ReActAgent(
             name="mutimodel_agent",
@@ -109,7 +106,8 @@ oxy_space = [
         name="executor_agent",
         prompt=EXECUTOR_SYSTEM_PROMPT,
         llm_model="chat_llm",
-        sub_agents=[ "browser_agent", "bilibili_agent", "mutimodel_agent", "document_agent", "math_agent"],
+        sub_agents=["mutimodel_agent", "document_agent", "math_agent", "browser_agent"],
+        # tools=["browser_tool", "bilibili_tool"],
     ),
     oxy.ReActAgent(
         is_master=True,
