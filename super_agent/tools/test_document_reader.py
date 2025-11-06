@@ -49,7 +49,7 @@ async def test_read_pdf_document():
     print("Testing read_pdf_document function...")
 
     # Test file path
-    test_file = "/home/rene/projs/super-agent/OxyGent/data/valid/help_1756092800998.pdf"
+    test_file = "help_1756092800998.pdf"
 
     try:
         # Try to import and use the actual function

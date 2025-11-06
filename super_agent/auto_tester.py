@@ -24,25 +24,30 @@ oxy_space = [
         base_url=os.getenv("DEFAULT_LLM_BASE_URL"),
         model_name=os.getenv("DEFAULT_LLM_CHAT_MODEL_NAME"),
     ),
-    # oxy.HttpLLM(
-    #     name="reason_llm",
-    #     api_key=os.getenv("DEFAULT_LLM_API_KEY"),
-    #     base_url=os.getenv("DEFAULT_LLM_BASE_URL"),
-    #     model_name=os.getenv("DEFAULT_LLM_REASON_MODEL_NAME"),
-    # ),
     multimodal_tools,
     document_tools,
     preset_tools.math_tools,
-    # oxy.ReActAgent(
-    #     name="math_agent",
-    #     llm_model="reason_llm",
-    #     desc="A tool that can perform mathematical calculations.",
-    #     tools=["math_tools"],
+    # oxy.StdioMCPClient(
+    #     name="browser_tool",
+    #     params={
+    #         "command": "npx",
+    #         "args": ["-y", "@midscene/mcp"],
+    #         "env": {
+    #             "MIDSCENE_MODEL_NAME": "REPLACE_WITH_YOUR_MODEL_NAME",
+    #             "OPENAI_API_KEY": "REPLACE_WITH_YOUR_OPENAI_API_KEY",
+    #             "MCP_SERVER_REQUEST_TIMEOUT": "800000"
+    #         }
+    #     },
+    #     category="tool",
+    #     class_name="StdioMCPClient",
+    #     desc="Browser automation tools via MCP",
+    #     desc_for_llm="Browser automation tools via MCP protocol"
     # ),
     oxy.StdioMCPClient(
         name="browser_tool",
         params={
             "command": "npx",
+            # "args": ["-y", "chrome-devtools-mcp@latest"]
             "args": ["@browsermcp/mcp@latest"]
         },
         category="tool",
@@ -50,27 +55,28 @@ oxy_space = [
         desc="Browser automation tools via MCP",
         desc_for_llm="Browser automation tools via MCP protocol"
     ),
-    oxy.StdioMCPClient(
-        name="bilibili_tool",
-        params={
-            "command": "uvx",
-            "args": [
-                "bilibili-video-info-mcp"
-            ],
-            "env": {
-                "SESSDATA": "291a4d7f%2C1776822769%2Ccd1d4%2Aa2CjAxyNqdhhOz9-MzqX7A2f9mF8QzuIuunF847jM5c_YrvNuaddXj68U6vMsq7MtSfJwSVk9fME9TMFlFWVNHdmVCVHJEb1F1end3bzJYZXdaVjNLMnFQQWRfV2NXRTRoMXktdVhIUjAtcmVVblBHbi1taUxnS3p0dy1kSXRwQW1IQmxDWnhzMF9nIIEC"
-            }
-        },
-        category="tool",
-        class_name="StdioMCPClient",
-        desc="Browser automation tools via MCP",
-        desc_for_llm="通过MCP协议提取b站字幕、弹幕、评论"
-    ),
+    # oxy.StdioMCPClient(
+    #     name="bilibili_tool",
+    #     params={
+    #         "command": "uvx",
+    #         "args": [
+    #             "bilibili-video-info-mcp"
+    #         ],
+    #         "env": {
+    #             "SESSDATA": "291a4d7f%2C1776822769%2Ccd1d4%2Aa2CjAxyNqdhhOz9-MzqX7A2f9mF8QzuIuunF847jM5c_YrvNuaddXj68U6vMsq7MtSfJwSVk9fME9TMFlFWVNHdmVCVHJEb1F1end3bzJYZXdaVjNLMnFQQWRfV2NXRTRoMXktdVhIUjAtcmVVblBHbi1taUxnS3p0dy1kSXRwQW1IQmxDWnhzMF9nIIEC"
+    #         }
+    #     },
+    #     category="tool",
+    #     class_name="StdioMCPClient",
+    #     desc="Browser automation tools via MCP",
+    #     desc_for_llm="通过MCP协议提取b站字幕、弹幕、评论"
+    # ),
 
     oxy.ReActAgent(
             name="browser_agent",
             llm_model="chat_llm",
-            desc_for_llm="可以使用浏览器检索的agent",
+            desc="可以使用浏览器检索信息的agent",
+            desc_for_llm="可以使用浏览器检索信息的agent",
             category="agent",
             class_name="ReActAgent",
             tools=["browser_tool"],
@@ -80,24 +86,26 @@ oxy_space = [
             is_save_data=True,
             is_multimodal_supported=False,
             semaphore=2,
+
+            short_memory_size=3,              # 减少到5轮对话
+            memory_max_tokens=8000,           # 减少Token限制
+            is_discard_react_memory=True,     # 丢弃详细ReAct记忆
+            weight_short_memory=8,            # 增加短期记忆权重
+            weight_react_memory=1,            # 降低ReAct记忆权重
+            max_react_rounds=8,               # 减少最大推理轮数
         ),
     oxy.ReActAgent(
             name="math_agent",
             llm_model="chat_llm",
+            desc="可以使用数学工具解决数学问题的agent",
             desc_for_llm="可以使用数学工具解决数学问题的agent",
             category="agent",
             tools=["math_tools"],
         ),
     oxy.ReActAgent(
-            name="bilibili_agent",
-            llm_model="chat_llm",
-            desc_for_llm="可以提取b站字幕、弹幕和评论的agent",
-            category="agent",
-            tools=["bilibili_tool"],
-        ),
-    oxy.ReActAgent(
             name="mutimodel_agent",
             llm_model="chat_llm",
+            desc="可以理解图片，视频的多模态理解agent",
             desc_for_llm="可以理解图片，视频的多模态理解agent",
             category="agent",
             tools=["multimodal_tools"],
@@ -105,6 +113,7 @@ oxy_space = [
     oxy.ReActAgent(
         name="document_agent",
         llm_model="chat_llm",
+        desc="可以读取txt,pdf,ppt,xlsx格式文件的agent",
         desc_for_llm="可以读取txt,pdf,ppt,xlsx格式文件的agent",
         category="agent",
         tools=["document_tools"],
@@ -113,7 +122,8 @@ oxy_space = [
         name="executor_agent",
         prompt=EXECUTOR_SYSTEM_PROMPT,
         llm_model="chat_llm",
-        sub_agents=[ "browser_agent", "bilibili_agent", "mutimodel_agent", "document_agent", "math_agent"],
+        sub_agents=["mutimodel_agent", "document_agent", "math_agent", "browser_agent"],
+        # tools=["browser_tool", "bilibili_tool"],
     ),
     oxy.ReActAgent(
         is_master=True,
@@ -166,7 +176,7 @@ async def main():
     Config.set_app_name(f'mas_test_{timestamp}')
 
     # 加载验证集数据（也可以改为测试集）
-    data_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'test', 'data1.jsonl')
+    data_path = os.path.join(os.getenv('DEFAULT_FILE_PATH'), 'data_sd.jsonl')
     # 如果要使用测试集，请取消注释下面一行并注释上面一行
     # data_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'test', 'data.jsonl')
 
@@ -186,9 +196,10 @@ async def main():
     results = []
 
     async with MAS(oxy_space=oxy_space) as mas:
+        # 先启动Web服务以确保MCP正确初始化
         # if use_batch_processing:
         # 批量处理模式 - 每次5个任务
-        print("使用批量处理模式（每次处理5个任务）...")
+        print("使用批量处理模式（每次处理1个任务）...")
 
         batch_size = 1
         total_tasks = len(test_data)
@@ -242,7 +253,7 @@ async def main():
                 print(f"任务 {task_data['task_id']} 完成，答案: {answer[:100]}...")
                 # 每个批次完成后保存中间结果
                 current_progress = batch_end
-                save_results(results, f"./test_results/intermediate_results_{current_progress}.jsonl")
+                save_results(results, os.getenv('DEFAULT_FILE_PATH') + f"test_results\\intermediate_results_{current_progress}.jsonl")
                 print(f"已保存中间结果 ({current_progress}/{total_tasks} 个任务)")
 
             
