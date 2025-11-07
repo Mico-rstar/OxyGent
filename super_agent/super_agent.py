@@ -151,7 +151,7 @@ oxy_space = [
         prompt=MASTER_SYSTEM_PROMPT,
         llm_model="chat_llm",
         sub_agents=[ "executor_agent"],
-    ),
+    )
 ]
 
 
