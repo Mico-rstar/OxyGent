@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from oxygent import MAS, Config, oxy, preset_tools
 from tools.multimodal_tools import multimodal_tools
 from tools.document_reader import document_tools
+from tools.stock_tools import stock_tools
 from prompts import BROWSER_SYSTEM_PROMPT, MASTER_SYSTEM_PROMPT, EXECUTOR_SYSTEM_PROMPT, NAVIGATE_AGENT
 
 # 自动加载 .env 文件中的环境变量
@@ -28,6 +29,7 @@ oxy_space = [
     ),
     multimodal_tools,
     document_tools,
+    stock_tools,
     preset_tools.math_tools,
     # oxy.StdioMCPClient(
     #     name="browser_tool",
@@ -81,7 +83,7 @@ oxy_space = [
             desc_for_llm="浏览器使用专家agent，请在query中描述具体任务",
             category="agent",
             class_name="ReActAgent",
-            tools=["browser_tool"],
+            tools=["browser_tool", "stock_tools"],
             # sub_agents=["browser_navigate_agent"],
             prompt=BROWSER_SYSTEM_PROMPT,
             is_entrance=False,
