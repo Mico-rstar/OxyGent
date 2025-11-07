@@ -64,7 +64,7 @@ Arguments:
     {"tool":"performance_stop_trace"}
 
 20. press_key - 按键操作
-    {"tool":"press_key", "key":"按键组合，如Enter、Control+A"}
+    {"tool":"press_key", "key":"按键组合，如Enter、Control+A", "filter_question":"用于页面内容智能过滤的关键问题或关键词，如果留空则返回全部页面内容"}
 
 21. resize_page - 调整页面大小
     {"tool":"resize_page", "width":宽度, "height":高度}
@@ -72,23 +72,30 @@ Arguments:
 22. select_page - 选择页面
     {"tool":"select_page", "pageIdx":页面索引}
 
-23. take_screenshot - 截图
-    {"tool":"take_screenshot", "format":"png/jpeg/webp", "quality":质量, "uid":"元素uid", "fullPage":false, "filePath":"保存路径"}
 
-24. take_snapshot - 获取页面快照
-    {"tool":"take_snapshot", "verbose":false, "filePath":"保存路径"}
+23. take_snapshot - 获取页面快照
+    {"tool":"take_snapshot", "verbose":false, "filePath":"保存路径", "filter_question":"用于页面内容智能过滤的关键问题或关键词，如果留空则返回全部页面内容"}
 
-25. upload_file - 上传文件
+24. upload_file - 上传文件
     {"tool":"upload_file", "uid":"文件输入元素uid", "filePath":"本地文件路径"}
 
-26. wait_for - 等待文本出现
+25. wait_for - 等待文本出现
     {"tool":"wait_for", "text":"等待的文本", "timeout":超时时间}
 
 使用示例：
+1. 基本浏览器操作：
 {
     "tool_name": "browser_agent",
     "arguments": {
         "query": "{\"tool\":\"click\", \"uid\":\"button-123\", \"dblClick\":true}"
+    }
+}
+
+2. 带内容过滤的页面快照：
+{
+    "tool_name": "browser_agent",
+    "arguments": {
+        "query": "{\"tool\":\"take_snapshot\", \"verbose\":true, \"filePath\":\"snapshot.txt\", \"filter_question\":\"查找关于京东公司业务范围的信息\"}"
     }
 }
 """
@@ -142,8 +149,13 @@ A: 1.使用browser_agent导航到京东零售云 https://www.jdx.com/home 2.使�
 }
 ```
 
+## 页面内容智能过滤策略
+**重要**: 当需要使用take_snapshot或press_key获取页面内容时，强烈建议使用filter_question参数进行内容过滤，这样可以：
+- 大幅减少无关信息，提高分析效率
+- 获得更精准的页面内容，便于快速找到答案
+- 节省处理时间和成本
+
 ## 约束
-- 请注意，你无法查看图片，不要调用截图工具
 - 所有浏览器操作都通过browser_agent工具执行，将具体操作参数以JSON字符串形式传递给query参数
 - query参数中的JSON必须正确转义，确保格式正确
 
@@ -171,4 +183,32 @@ A: 1.使用browser_agent导航到京东零售云 https://www.jdx.com/home 2.使�
     "recommendation": "替代方案或代理的建议"
 }
 ```
+"""
+
+
+# 页面内容过滤提示词（小模型专用）
+PAGE_CONTENT_COMPRESSION_PROMPT = """
+你是一个页面内容过滤器，只负责删除无关信息，保留相关内容。
+
+用户问题：{original_question}
+
+页面内容：
+{page_content}
+
+## 任务
+删除与用户问题无关的内容，只保留可能相关的页面元素。保持原有格式不变。
+
+## 过滤规则
+- **删除**: 导航菜单、页脚、版权信息、社交媒体链接、广告、装饰性元素
+- **删除**: 与用户问题完全无关的内容和链接
+- **保留**: 可能包含答案的文本、链接、按钮、表单
+- **保留**: 所有uid和层级结构，不要修改
+
+## 输出要求
+1. 完全保持原有格式和结构
+2. 只删除无关的uid行，保留所有相关行
+3. 不要添加任何说明或总结
+4. 直接输出过滤后的页面内容
+
+输出：
 """
