@@ -10,6 +10,54 @@ load_dotenv()
 
 Config.set_agent_llm_model("default_llm")
 
+async def planner_executor_workflow(oxy_request: OxyRequest):
+    """
+    规划-执行工作流：将复杂任务先分解为计划，然后执行计划
+    """
+    query = oxy_request.get_query()
+    print(f"[Planner-Executor Workflow] 接收到任务: {query}")
+
+    try:
+        # 第一步：调用planner_agent进行任务规划
+        print("[Planner-Executor Workflow] 开始任务规划...")
+
+        planner_response = await oxy_request.call(
+            callee="planner_agent",
+            arguments={"query": query}
+        )
+
+        if planner_response.state.name != "COMPLETED":
+            return f"任务规划失败: {planner_response.output}"
+
+        # 获取planner返回的markdown格式执行计划
+        task_plan_markdown = planner_response.output
+        print(f"[Planner-Executor Workflow] 规划完成，收到markdown格式计划")
+
+        # 简单验证是否是有效的计划格式
+        if "## 执行计划" not in task_plan_markdown:
+            # 如果没有包含执行计划结构，可能是直接答案或错误信息
+            print("[Planner-Executor Workflow] 未检测到执行计划结构，直接返回规划结果")
+            return task_plan_markdown
+
+        # 第二步：调用executor_agent执行计划
+        print("[Planner-Executor Workflow] 开始执行计划...")
+
+        executor_response = await oxy_request.call(
+            callee="executor_agent",
+            arguments={"query": task_plan_markdown}
+        )
+
+        if executor_response.state.name != "COMPLETED":
+            return f"任务执行失败: {executor_response.output}"
+
+        # 返回最终执行结果
+        print("[Planner-Executor Workflow] 任务执行完成")
+        return executor_response.output
+
+    except Exception as e:
+        return f"规划-执行工作流发生错误: {str(e)}"
+
+
 async def data_workflow(oxy_request: OxyRequest):
     import json
 
@@ -40,7 +88,7 @@ async def data_workflow(oxy_request: OxyRequest):
         max_browser_retries = 2
         browser_retry_count = 0
 
-        while browser_response.state.name != "COMPLETED" and browser_retry_count < max_browser_retries:
+        while (browser_response.state.name != "COMPLETED" or "Timed out after waiting" in browser_response.output) and browser_retry_count < max_browser_retries:
             browser_retry_count += 1
             print(f"[Data Workflow] 浏览器操作失败: {browser_response.state.name}，进行第 {browser_retry_count} 次重试")
 

@@ -6,8 +6,8 @@ from oxygent import MAS, Config, oxy, preset_tools
 from tools.multimodal_tools import multimodal_tools
 from tools.document_reader import document_tools
 from tools.stock_tools import stock_tools
-from prompts import BROWSER_SYSTEM_PROMPT, MASTER_SYSTEM_PROMPT, EXECUTOR_SYSTEM_PROMPT, PAGE_CONTENT_COMPRESSION_PROMPT, BROWSER_TOOL_PROXY_DESC
-from workflow.workflows import data_workflow
+from prompts import BROWSER_SYSTEM_PROMPT, MASTER_SYSTEM_PROMPT, EXECUTOR_SYSTEM_PROMPT, PLANNER_SYSTEM_PROMPT, PAGE_CONTENT_COMPRESSION_PROMPT, BROWSER_TOOL_PROXY_DESC
+from workflow.workflows import data_workflow, planner_executor_workflow
 
 # 自动加载 .env 文件中的环境变量
 load_dotenv()
@@ -155,19 +155,69 @@ oxy_space = [
         category="agent",
         tools=["document_tools"],
     ),
+    # 规划智能体 - 内部使用，不对外暴露
+    oxy.ReActAgent(
+        name="planner_agent",
+        prompt=PLANNER_SYSTEM_PROMPT,
+        llm_model="chat_llm",
+        desc="任务规划智能体，负责将复杂任务分解为可执行的计划",
+        desc_for_llm="任务规划智能体，负责将复杂任务分解为可执行的计划",
+        category="agent",
+        is_entrance=False,
+        is_permission_required=False,
+        is_save_data=True,
+        is_multimodal_supported=False,
+        short_memory_size=3,
+        memory_max_tokens=16000,
+    ),
+
+    # 股票智能体 - 专门负责股票数据查询
+    oxy.ReActAgent(
+        name="stock_agent",
+        llm_model="chat_llm",
+        desc="股票数据查询专家，专门负责港股和美股历史数据查询",
+        desc_for_llm="股票数据查询专家，专门负责港股和美股历史数据查询",
+        category="agent",
+        tools=["stock_tools"],
+        is_entrance=False,
+        is_permission_required=False,
+        is_save_data=True,
+        is_multimodal_supported=False,
+        short_memory_size=3,
+        memory_max_tokens=8000,
+    ),
+
+    # 执行智能体 - 内部使用，不对外暴露
     oxy.ReActAgent(
         name="executor_agent",
         prompt=EXECUTOR_SYSTEM_PROMPT,
         llm_model="chat_llm",
-        sub_agents=["mutimodel_agent", "document_agent", "math_agent", "browser_agent"],
+        sub_agents=["mutimodel_agent", "document_agent", "math_agent", "browser_agent", "stock_agent"],
         # tools=["browser_tool", "bilibili_tool"],
     ),
+
+    # 规划-执行工作流 - 封装planner和executor的主要工作流
+    oxy.WorkflowAgent(
+        name="planner_executor_workflow",
+        desc="规划-执行工作流，负责将复杂任务先规划后执行",
+        desc_for_llm="规划-执行工作流，负责将复杂任务先规划后执行",
+        sub_agents=["planner_agent", "executor_agent"],
+        func_workflow=planner_executor_workflow,
+        llm_model="chat_llm",
+        is_retain_master_short_memory=True,
+        is_entrance=False,
+        is_permission_required=False,
+        is_save_data=True,
+        is_multimodal_supported=False,
+    ),
+
+    # 主智能体 - 只负责调用工作流和输出结果
     oxy.ReActAgent(
         is_master=True,
         name="master_agent",
         prompt=MASTER_SYSTEM_PROMPT,
         llm_model="chat_llm",
-        sub_agents=[ "executor_agent"],
+        sub_agents=["planner_executor_workflow"],
     )
 ]
 
