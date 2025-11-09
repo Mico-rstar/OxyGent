@@ -88,7 +88,19 @@ async def data_workflow(oxy_request: OxyRequest):
         return f"执行浏览器操作时发生错误: {str(e)}"
 
 
-oxy_space = [
+
+
+
+# async def main():
+#     async with MAS(oxy_space=oxy_space) as mas:
+#         await mas.start_web_service(
+#             first_query="查询一下东汉公元几几年灭亡的"
+#         )
+
+
+if __name__ == "__main__":
+    # asyncio.run(main())
+    oxy_space = [
     oxy.HttpLLM(
         name="chat_llm",
         api_key=os.getenv("DASHSCOPE_API_KEY"),
@@ -137,14 +149,3 @@ oxy_space = [
         sub_agents=[ "browser_agent"]
     )
 ]
-
-
-async def main():
-    async with MAS(oxy_space=oxy_space) as mas:
-        await mas.start_web_service(
-            first_query="查询一下东汉公元几几年灭亡的"
-        )
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

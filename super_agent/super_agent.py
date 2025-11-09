@@ -6,7 +6,8 @@ from oxygent import MAS, Config, oxy, preset_tools
 from tools.multimodal_tools import multimodal_tools
 from tools.document_reader import document_tools
 from tools.stock_tools import stock_tools
-from prompts import BROWSER_SYSTEM_PROMPT, MASTER_SYSTEM_PROMPT, EXECUTOR_SYSTEM_PROMPT, NAVIGATE_AGENT
+from prompts import BROWSER_SYSTEM_PROMPT, MASTER_SYSTEM_PROMPT, EXECUTOR_SYSTEM_PROMPT, PAGE_CONTENT_COMPRESSION_PROMPT, BROWSER_TOOL_PROXY_DESC
+from workflow.workflows import data_workflow
 
 # 自动加载 .env 文件中的环境变量
 load_dotenv()
@@ -83,8 +84,8 @@ oxy_space = [
             desc_for_llm="浏览器使用专家agent，请在query中描述具体任务",
             category="agent",
             class_name="ReActAgent",
-            tools=["browser_tool", "stock_tools"],
-            # sub_agents=["browser_navigate_agent"],
+            # tools=["browser_tool", "stock_tools"],
+            sub_agents=["browser_proxy_agent"],
             prompt=BROWSER_SYSTEM_PROMPT,
             is_entrance=False,
             is_permission_required=False,
@@ -115,20 +116,36 @@ oxy_space = [
             category="agent",
             tools=["multimodal_tools"],
     ),
-    oxy.ReActAgent(
-            name="browser_navigate_agent",
-            desc_for_llm="navigate到指定页面，并对页面内容进行压缩agent",
-            category="agent",
-            llm_model="flash_llm",
-            prompt=NAVIGATE_AGENT,
-            tools=["browser_tool"],
+    # oxy.ReActAgent(
+    #         name="browser_navigate_agent",
+    #         desc_for_llm="navigate到指定页面，并对页面内容进行压缩agent",
+    #         category="agent",
+    #         llm_model="flash_llm",
+    #         prompt=NAVIGATE_AGENT,
+    #         tools=["browser_tool"],
 
-            short_memory_size=1,
-            memory_max_tokens=8000,           # 减少Token限制
-            is_discard_react_memory=True,     # 丢弃详细ReAct记忆
-            weight_short_memory=8,            # 增加短期记忆权重
-            weight_react_memory=1,            # 降低ReAct记忆权重
-            max_react_rounds=8,               # 减少最大推理轮数
+    #         short_memory_size=1,
+    #         memory_max_tokens=8000,           # 减少Token限制
+    #         is_discard_react_memory=True,     # 丢弃详细ReAct记忆
+    #         weight_short_memory=8,            # 增加短期记忆权重
+    #         weight_react_memory=1,            # 降低ReAct记忆权重
+    #         max_react_rounds=8,               # 减少最大推理轮数
+    # ),
+    oxy.ChatAgent(
+        name='compress_agent',
+        prompt=PAGE_CONTENT_COMPRESSION_PROMPT,
+        llm_model='flash_llm',
+        short_memory_size=1
+    ),
+    oxy.WorkflowAgent(
+        name='browser_proxy_agent',
+        desc=BROWSER_TOOL_PROXY_DESC,
+        sub_agents=['compress_agent'],
+        tools = ["browser_tool"],
+        func_workflow=data_workflow,
+        llm_model='flash_llm',
+        is_retain_master_short_memory=True,
+        extra_permitted_tool_name_list=["browser_tool"]
     ),
     oxy.ReActAgent(
         name="document_agent",
