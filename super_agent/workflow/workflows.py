@@ -1,9 +1,11 @@
 import asyncio
 import os
+import uuid
 from dotenv import load_dotenv
 
 from oxygent import MAS, Config, oxy, OxyRequest
 from prompts import BROWSER_TOOL_PROXY_DESC, BROWSER_SYSTEM_PROMPT, PAGE_CONTENT_COMPRESSION_PROMPT
+from tools.multimodal_tools import understand_image_inner
 
 # 自动加载 .env 文件中的环境变量
 load_dotenv()
@@ -18,12 +20,30 @@ async def planner_executor_workflow(oxy_request: OxyRequest):
     print(f"[Planner-Executor Workflow] 接收到任务: {query}")
 
     try:
-        # 第一步：调用planner_agent进行任务规划
+        # 第一步：获取executor_agent的tools_description
+        print("[Planner-Executor Workflow] 获取executor_agent的工具描述...")
+
+        # 创建临时的oxy_request来获取executor_agent的tools_description
+        temp_oxy_request_for_tools = oxy_request.model_copy()
+        temp_oxy_request_for_tools.callee = "executor_agent"
+        temp_oxy_request_for_tools.caller = "planner_executor_workflow"
+
+        # 调用executor_agent的_before_execute方法来获取tools_description
+        executor_agent = oxy_request.get_oxy("executor_agent")
+        temp_oxy_request_for_tools = await executor_agent._before_execute(temp_oxy_request_for_tools)
+        executor_tools_description = temp_oxy_request_for_tools.arguments.get("tools_description", "")
+
+        print(f"[Planner-Executor Workflow] 获取到executor_agent工具描述，长度: {len(executor_tools_description)}")
+
+        # 第二步：调用planner_agent进行任务规划，传入executor的工具描述
         print("[Planner-Executor Workflow] 开始任务规划...")
 
         planner_response = await oxy_request.call(
             callee="planner_agent",
-            arguments={"query": query}
+            arguments={
+                "query": query,
+                "executor_tools_description": executor_tools_description
+            }
         )
 
         if planner_response.state.name != "COMPLETED":
@@ -58,6 +78,26 @@ async def planner_executor_workflow(oxy_request: OxyRequest):
         return f"规划-执行工作流发生错误: {str(e)}"
 
 
+# 26. take_screenshot - 截图
+#     {"tool":"take_screenshot", "format":"png/jpeg/webp", "quality":质量, "uid":"元素uid", "fullPage":false, "filePath":"保存路径"}
+async def understand_screenshot(oxy_request: OxyRequest, query: str, uid: str, fullPage: bool):
+    # 获取截图
+    format = 'jpg'
+    filename = f'{uuid.uuid4()}.{format}'
+    filePath = os.getenv("FILE_DOWNLOAD_PATH") + filename
+    args = {"tool":"take_screenshot", "format":format, "uid":uid, "fullPage":fullPage, "filePath":filePath}
+    browser_response = await oxy_request.call(
+        callee = "take_screen",
+        arguments=args
+    )
+
+    # 理解截图信息
+    image_response = await understand_image_inner(filePath, query)
+    return image_response
+
+
+
+
 async def data_workflow(oxy_request: OxyRequest):
     import json
 
@@ -76,6 +116,10 @@ async def data_workflow(oxy_request: OxyRequest):
         else:
             query_data.pop('tool', '')
             query_data.pop('filter_query', '')
+
+        if tool_name == 'understand_screenshot':
+            res = understand_screenshot(oxy_request, query_data.get('query', ''), query_data.get('uid', ''), query_data.get('fullPage', False))
+            return res
         
 
         # 代理调用浏览器工具

@@ -221,3 +221,66 @@ def understand_video(
     except Exception as e:
         raise ValueError(f"视频理解失败: {str(e)}")
 
+async def understand_image_inner(
+    image_path: str,
+    question: str,
+) -> str:
+    """
+    使用阿里云通义千问多模态模型理解图片内容
+
+    Args:
+        image_path: 图片文件的绝对路径
+        question: 关于图片的问题
+        api_key: 阿里云DashScope API Key
+        model: 模型名称
+
+    Returns:
+        图片理解结果的文本描述
+
+    Raises:
+        ImportError: 如果dashscope库未安装
+        FileNotFoundError: 如果图片文件不存在
+        ValueError: 如果API调用失败
+    """
+    model: str = "qwen3-vl-plus"
+
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"图片文件不存在: {image_path}")
+
+    # 使用提供的API Key或环境变量
+    key = os.getenv('DASHSCOPE_API_KEY')
+    if not key:
+        raise ValueError("未找到DashScope API Key，请设置环境变量DASHSCOPE_API_KEY或提供api_key参数")
+
+    try:
+        # 构建图片路径
+        image_uri = f"file://{image_path}"
+
+        # 构建消息
+        messages = [
+            {
+                'role': 'user',
+                'content': [
+                    {'image': image_uri},
+                    {'text': question}
+                ]
+            }
+        ]
+
+        # 调用API
+        response = MultiModalConversation.call(
+            api_key=key,
+            model=model,
+            messages=messages
+        )
+
+        # 检查响应状态
+        if response.status_code != 200:
+            raise ValueError(f"API调用失败，状态码: {response.status_code}, 响应: {response.message}")
+
+        # 提取结果
+        result = response["output"]["choices"][0]["message"]["content"][0]["text"]
+        return result
+
+    except Exception as e:
+        raise ValueError(f"图片理解失败: {str(e)}")

@@ -14,6 +14,7 @@ import fitz  # PyMuPDF
 import pandas as pd
 from dashscope import MultiModalConversation
 from pptx import Presentation
+import pyarrow.parquet as pq
 
 from oxygent.oxy import FunctionHub
 
@@ -212,6 +213,85 @@ def read_ppt_document(
     except Exception as e:
         raise ValueError(f"PPT文档读取失败: {str(e)}")
 
+
+
+@document_tools.tool(description="读取Parquet文档内容")
+def read_parquet_document(
+    filename: str = Field(description="Parquet文档的文件名"),
+    max_rows: int = Field(default=1000, description="最大读取行数，默认1000行"),
+) -> str:
+    """
+    读取Parquet文档内容
+
+    Args:
+        file_path: Parquet文档文件的绝对路径
+        max_rows: 最大读取行数，默认1000行
+
+    Returns:
+        文档内容的格式化字符串
+
+    Raises:
+        ImportError: 如果缺少依赖库
+        FileNotFoundError: 如果文件不存在
+        ValueError: 如果API调用失败
+    """
+    file_path = os.getenv("DEFAULT_FILE_PATH") + filename
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Parquet文件不存在: {file_path}")
+
+    try:
+        # 读取Parquet文件的元数据
+        parquet_file = pq.ParquetFile(file_path)
+
+        # 获取schema信息
+        schema = parquet_file.schema_arrow
+        num_rows = parquet_file.metadata.num_rows
+        num_columns = len(schema)
+
+        result_parts = []
+        result_parts.append(f"=== Parquet文件信息 ===")
+        result_parts.append(f"文件路径: {file_path}")
+        result_parts.append(f"总行数: {num_rows:,}")
+        result_parts.append(f"总列数: {num_columns}")
+        result_parts.append(f"列信息: {[field.name for field in schema]}")
+        result_parts.append("")
+
+        # 使用pandas读取数据（限制行数以避免内存问题）
+        df = pd.read_parquet(file_path)
+
+        if df.empty:
+            result_parts.append("Parquet文件为空")
+            return "\n".join(result_parts)
+
+        # 如果数据量很大，只显示前几行
+        if len(df) > max_rows:
+            result_parts.append(f"数据预览（前 {max_rows} 行，共 {len(df):,} 行）:")
+            df_preview = df.head(max_rows)
+        else:
+            result_parts.append(f"完整数据（共 {len(df):,} 行）:")
+            df_preview = df
+
+        # 转换为字符串格式
+        result_parts.append(f"{df_preview.to_string(index=False)}")
+
+        # 添加数据类型信息
+        result_parts.append("")
+        result_parts.append("=== 数据类型信息 ===")
+        for col, dtype in df.dtypes.items():
+            result_parts.append(f"{col}: {dtype}")
+
+        # 添加基本统计信息（仅对数值列）
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        if not numeric_cols.empty:
+            result_parts.append("")
+            result_parts.append("=== 数值列统计信息 ===")
+            stats = df[numeric_cols].describe()
+            result_parts.append(f"{stats.to_string()}")
+
+        return "\n".join(result_parts)
+
+    except Exception as e:
+        raise ValueError(f"Parquet文档读取失败: {str(e)}")
 
 
 @document_tools.tool(description="读取Excel文档内容")

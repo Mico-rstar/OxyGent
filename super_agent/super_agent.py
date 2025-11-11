@@ -6,7 +6,8 @@ from oxygent import MAS, Config, oxy, preset_tools
 from tools.multimodal_tools import multimodal_tools
 from tools.document_reader import document_tools
 from tools.stock_tools import stock_tools
-from prompts import BROWSER_SYSTEM_PROMPT, MASTER_SYSTEM_PROMPT, EXECUTOR_SYSTEM_PROMPT, PLANNER_SYSTEM_PROMPT, PAGE_CONTENT_COMPRESSION_PROMPT, BROWSER_TOOL_PROXY_DESC
+from tools.python_tools import python_tools
+from prompts import BROWSER_SYSTEM_PROMPT, MASTER_SYSTEM_PROMPT, EXECUTOR_SYSTEM_PROMPT, PLANNER_SYSTEM_PROMPT, PAGE_CONTENT_COMPRESSION_PROMPT, BROWSER_TOOL_PROXY_DESC, STOCK_SYSTEM_PROMPT, PYTHON_SYSTEM_PROMPT
 from workflow.workflows import data_workflow, planner_executor_workflow
 
 # 自动加载 .env 文件中的环境变量
@@ -28,10 +29,16 @@ oxy_space = [
         base_url=os.getenv("DEFAULT_LLM_BASE_URL"),
         model_name=os.getenv("FLASH_LLM_MODEL_NAME"),
     ),
+    oxy.HttpLLM(
+        name="coder_llm",
+        api_key=os.getenv("DASHSCOPE_API_KEY"),
+        base_url=os.getenv("DEFAULT_LLM_BASE_URL"),
+        model_name=os.getenv("CODER_LLM_MODEL_NAME"),
+    ),
     multimodal_tools,
     document_tools,
     stock_tools,
-    preset_tools.math_tools,
+    python_tools,
     # oxy.StdioMCPClient(
     #     name="browser_tool",
     #     params={
@@ -81,7 +88,7 @@ oxy_space = [
             name="browser_agent",
             llm_model="chat_llm",
             desc="可以使用浏览器检索信息的agent",
-            desc_for_llm="浏览器使用专家agent，请在query中描述具体任务",
+            desc_for_llm="浏览器使用专家agent,专门负责网页操作和信息检索,包括点击、导航、表单填写、页面截图理解等",
             category="agent",
             class_name="ReActAgent",
             # tools=["browser_tool", "stock_tools"],
@@ -101,20 +108,22 @@ oxy_space = [
             max_react_rounds=8,               # 减少最大推理轮数
         ),
     oxy.ReActAgent(
-            name="math_agent",
-            llm_model="chat_llm",
-            desc="可以使用数学工具解决数学问题的agent",
-            desc_for_llm="可以使用数学工具解决数学问题的agent",
-            category="agent",
-            tools=["math_tools"],
-        ),
-    oxy.ReActAgent(
             name="mutimodel_agent",
             llm_model="chat_llm",
             desc="可以理解图片，视频的多模态理解agent",
             desc_for_llm="可以理解图片，视频的多模态理解agent",
             category="agent",
             tools=["multimodal_tools"],
+    ),
+    oxy.ReActAgent(
+            name="python_agent",
+            llm_model="coder_llm",
+            desc="Python代码专家，专门负责代码生成、执行和数据分析计算任务",
+            desc_for_llm="Python代码专家，专门负责代码生成、执行和数据分析计算任务",
+            prompt=PYTHON_SYSTEM_PROMPT,
+            category="agent",
+            tools=["python_tools"],
+            # 能力边界：仅处理Python代码相关任务，不处理网页操作、文件读取、股票查询等
     ),
     # oxy.ReActAgent(
     #         name="browser_navigate_agent",
@@ -150,8 +159,9 @@ oxy_space = [
     oxy.ReActAgent(
         name="document_agent",
         llm_model="chat_llm",
-        desc="可以读取txt,pdf,ppt,xlsx格式文件的agent",
-        desc_for_llm="可以读取txt,pdf,ppt,xlsx格式文件的agent",
+        desc="文档处理专家，专门负责读取和解析txt、pdf、ppt、xlsx等多种格式文档",
+        desc_for_llm="文档处理专家，专门负责读取和解析txt、pdf、ppt、xlsx等多种格式文档",
+        # 能力边界：仅处理文档读取和内容提取任务，不处理网页操作、代码执行、股票查询等
         category="agent",
         tools=["document_tools"],
     ),
@@ -175,16 +185,12 @@ oxy_space = [
     oxy.ReActAgent(
         name="stock_agent",
         llm_model="chat_llm",
-        desc="股票数据查询专家，专门负责港股和美股历史数据查询",
-        desc_for_llm="股票数据查询专家，专门负责港股和美股历史数据查询",
+        desc="股票数据查询专家，专门负责港股和美股历史数据查询和分析",
+        desc_for_llm="股票数据查询专家，专门负责港股和美股历史数据查询和分析",
+        # 能力边界：仅处理股票数据查询任务，不处理网页操作、代码执行、文件读取等
+        prompt=STOCK_SYSTEM_PROMPT,
         category="agent",
         tools=["stock_tools"],
-        is_entrance=False,
-        is_permission_required=False,
-        is_save_data=True,
-        is_multimodal_supported=False,
-        short_memory_size=3,
-        memory_max_tokens=8000,
     ),
 
     # 执行智能体 - 内部使用，不对外暴露
@@ -192,7 +198,7 @@ oxy_space = [
         name="executor_agent",
         prompt=EXECUTOR_SYSTEM_PROMPT,
         llm_model="chat_llm",
-        sub_agents=["mutimodel_agent", "document_agent", "math_agent", "browser_agent", "stock_agent"],
+        sub_agents=["mutimodel_agent", "document_agent", "browser_agent", "stock_agent", "python_agent"],
         # tools=["browser_tool", "bilibili_tool"],
     ),
 
