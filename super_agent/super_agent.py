@@ -118,7 +118,7 @@ oxy_space = [
     oxy.ReActAgent(
             name="python_agent",
             llm_model="coder_llm",
-            desc="Python代码专家，专门负责代码生成、执行和数据分析计算任务",
+            desc="Python代码专家，编写代码并运行得到结果，可以利用python进行操作系统交互，网络任务，算法执行，数据分析，逻辑验证，计算任务",
             desc_for_llm="Python代码专家，专门负责代码生成、执行和数据分析计算任务",
             prompt=PYTHON_SYSTEM_PROMPT,
             category="agent",
